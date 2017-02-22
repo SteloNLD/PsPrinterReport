@@ -1,7 +1,7 @@
 ﻿#requires -version 3
 <#
 .SYNOPSIS
-  Report-Printers
+  PsPrinterReport
 .DESCRIPTION
   Creates a human readable report of all Printers on a specified print server
 .PARAMETER <Parameter_Name>
@@ -19,7 +19,7 @@
 
 #---------------------------------------------------------[Initialisations]--------------------------------------------------------
 
-cls 
+Clear-Host
 
 #Set Error Action to Stop, if an error occurs the script wil stop!
 $ErrorActionPreference = "Stop"
@@ -204,11 +204,6 @@ $CustomPrinterObjects | Export-Csv -Path ($sReportPath + '\'+ ((get-date).tostri
 #Log-Write -LineValue ('Recieving all PrintJob events from print server ' + $PrintServer) -LogPath $sLogFile
 #$PrintJobEvents = Get-WinEvent Microsoft-Windows-PrintService/Operational -ComputerName $PrintServer
 
-
-
 #***************************************************************************************************
 #                      Procesing the recieved Events.
 #***************************************************************************************************
-
-
-
