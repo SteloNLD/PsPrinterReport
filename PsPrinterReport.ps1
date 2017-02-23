@@ -25,7 +25,7 @@ Clear-Host
 $ErrorActionPreference = "Stop"
 
 #Dot Source or Import required Functions and Libraries
-Import-module .\Modules\PsLogHandler.psm1
+Import-module PsLogHandler
 
 #----------------------------------------------------------[Declarations]----------------------------------------------------------
 
@@ -69,6 +69,9 @@ if (!(Test-Path $sReportPath)) {
 #Log Start
 Log-Start -LogPath $sLogPath -LogName $sLogName -ScriptVersion $sScriptVersion -ScriptName $sScriptName -ScriptMaintainer $sScriptMaintainer
 
+
+ipconfig.exe /flushdns
+
 #***************************************************************************************************
 #                      Receiving Printers on Printserver.
 #***************************************************************************************************
@@ -96,20 +99,23 @@ foreach  ($Printer in $Printers)
         continue
     }
 
-
-
     Log-Write -LineValue 'preprocessing some printer information' -LogPath $sLogFile
+    
     $CustomPrinterObject = New-Object System.Object
-    $CustomPrinterObject | Add-Member -type NoteProperty -name Name -value $Printer.Name
-    $CustomPrinterObject | Add-Member -type NoteProperty -name Location -value $Printer.Location
-    $CustomPrinterObject | Add-Member -type NoteProperty -name Comment -value $Printer.Comment
-    $CustomPrinterObject | Add-Member -type NoteProperty -name PrinterStatus -value $Printer.PrinterStatus    
-    $CustomPrinterObject | Add-Member -type NoteProperty -name DriverName -value $Printer.DriverName
-    $CustomPrinterObject | Add-Member -type NoteProperty -name Shared -value $Printer.Shared
-    $CustomPrinterObject | Add-Member -type NoteProperty -name Published -value $Printer.Published
-    $CustomPrinterObject | Add-Member -type NoteProperty -name PortName -value $Printer.PortName    
+    $CustomPrinterObject | % {
+        $_ | Add-Member -type NoteProperty -name Name -value $Printer.Name
+        $_ | Add-Member -type NoteProperty -name Location -value $Printer.Location
+        $_ | Add-Member -type NoteProperty -name Comment -value $Printer.Comment
+        $_ | Add-Member -type NoteProperty -name PrinterStatus -value $Printer.PrinterStatus    
+        $_ | Add-Member -type NoteProperty -name DriverName -value $Printer.DriverName
+        $_ | Add-Member -type NoteProperty -name Shared -value $Printer.Shared
+        $_ | Add-Member -type NoteProperty -name Published -value $Printer.Published
+        $_ | Add-Member -type NoteProperty -name PortName -value $Printer.PortName        
+        $_ | Add-Member -type NoteProperty -name ConnectionTest -value $null
+        $_ | Add-Member -type NoteProperty -name ConnectionTestDesc -value $null
+        $_ | Add-Member -type NoteProperty -name IPAddress -value $null
 
-
+    }
 
     Log-Write -LineValue ($CustomPrinterObject | Out-String) -LogPath $sLogFile
                    
@@ -117,13 +123,14 @@ foreach  ($Printer in $Printers)
     {     
         
         Log-Write -LineValue 'Printer Portname is filled with IP Adress' -LogPath $sLogFile
-        
+        $CustomPrinterObject.IPAddress = $Printer.PortName
+
         if (Test-Connection -ComputerName $Printer.PortName -Count 2 -TimeToLive 15 -ErrorAction SilentlyContinue)
         {
 
             Log-Write -LineValue 'Connection Test Succeeded' -LogPath $sLogFile
-            $CustomPrinterObject | Add-Member -type NoteProperty -name ConnectionTest -value Succeeded
-            $CustomPrinterObject | Add-Member -type NoteProperty -name ConnectionTestDesc -value 'IP Ping Succeeded'
+            $CustomPrinterObject.ConnectionTest = 'Succeeded'
+            $CustomPrinterObject.ConnectionTestDesc = 'IP Ping Succeeded'
 
         }
 
@@ -131,8 +138,8 @@ foreach  ($Printer in $Printers)
         {
 
             Log-Write -LineValue 'Connection Test Failed' -LogPath $sLogFile
-            $CustomPrinterObject | Add-Member -type NoteProperty -name ConnectionTest -value Failed
-            $CustomPrinterObject | Add-Member -type NoteProperty -name ConnectionTestDesc -value 'IP Ping Failed'
+            $CustomPrinterObject.ConnectionTest = 'Failed'
+            $CustomPrinterObject.ConnectionTestDesc = 'IP Ping Failed'
 
         }
 
@@ -142,18 +149,17 @@ foreach  ($Printer in $Printers)
     {
         
         Log-Write -LineValue 'Printer Portname is filled with DNS Name' -LogPath $sLogFile
-
+        
         if (Resolve-DnsName $Printer.PortName -ErrorAction SilentlyContinue)
         {
-            
             Log-Write -LineValue 'DNS Name Resolved' -LogPath $sLogFile
+            $CustomPrinterObject.IPAddress = (Resolve-DnsName $Printer.PortName | Where-Object {$_.Type -eq "A"}).IPAddress
 
             if (Test-Connection -ComputerName $Printer.PortName -Count 2 -TimeToLive 15 -ErrorAction SilentlyContinue)
             {
-
                 Log-Write -LineValue 'Connection Test Succeeded' -LogPath $sLogFile
-                $CustomPrinterObject | Add-Member -type NoteProperty -name ConnectionTest -value Succeeded
-                $CustomPrinterObject | Add-Member -type NoteProperty -name ConnectionTestDesc -value 'DNS Ping Succeeded'
+                $CustomPrinterObject.ConnectionTest = 'Succeeded'
+                $CustomPrinterObject.ConnectionTestDesc = 'DNS Ping Succeeded'
 
             }
 
@@ -161,8 +167,8 @@ foreach  ($Printer in $Printers)
             {
 
                 Log-Write -LineValue 'Connection Test Failed' -LogPath $sLogFile
-                $CustomPrinterObject | Add-Member -type NoteProperty -name ConnectionTest -value Failed
-                $CustomPrinterObject | Add-Member -type NoteProperty -name ConnectionTestDesc -value 'DNS Ping Failed'
+                $CustomPrinterObject.ConnectionTest = 'Failed'
+                $CustomPrinterObject.ConnectionTestDesc = 'DNS Ping Failed'
             
             }
         }
@@ -173,8 +179,8 @@ foreach  ($Printer in $Printers)
             Log-Write -LineValue 'Could not resolve DNS Name' -LogPath $sLogFile
             Log-Write -LineValue 'Connection Test Failed' -LogPath $sLogFile
 
-            $CustomPrinterObject | Add-Member -type NoteProperty -name ConnectionTest -value Failed
-            $CustomPrinterObject | Add-Member -type NoteProperty -name ConnectionTestDesc -value 'DNS Resolve Failed'
+            $CustomPrinterObject.ConnectionTest = 'Failed'
+            $CustomPrinterObject.ConnectionTestDesc = 'DNS Resolve Failed'
         }
 
     }
